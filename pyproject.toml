@@ -8,9 +8,33 @@ version = "0.1.0"
 description = "Kubernetes post-incident forensics and timeline reconstruction"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+
 authors = [
-  { name = "Nikhil V" }
+  { name = "Nikhil V", email = "nikhil.thb@gmail.com" }
+]
+
+keywords = [
+  "kubernetes",
+  "devops",
+  "sre",
+  "incident-response",
+  "forensics",
+  "observability"
+]
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: OS Independent",
+  "Topic :: System :: Monitoring",
+  "Topic :: System :: Systems Administration"
 ]
 
 dependencies = [
@@ -20,8 +44,14 @@ dependencies = [
 [project.scripts]
 opsautopsy = "opsautopsy.cli:main"
 
-[tool.setuptools]
-packages = ["opsautopsy"]
+# ✅ Correct package discovery
+[tool.setuptools.packages.find]
+include = ["opsautopsy*"]
 
+# ✅ License files bundled
+[tool.setuptools]
+license-files = ["LICENSE", "NOTICE"]
+
+# ✅ Include SQL queries
 [tool.setuptools.package-data]
 opsautopsy = ["queries/*.sql"]
