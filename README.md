@@ -1,50 +1,57 @@
-Got it 👍
-Below is the **entire README.md wrapped inside a single code block**, so you can **copy–paste directly** into your repository without any formatting issues.
-
-(No images, no special markup — clean Markdown only.)
-
----
-
-```md
 # OpsAutopsy
 
-**OpsAutopsy** is a **cloud-agnostic, multi-cluster Kubernetes incident forensics engine**.
+**Cloud-agnostic, multi-cluster Kubernetes incident forensics engine**
 
-It focuses on **post-incident analysis**, not monitoring or alerting.  
-OpsAutopsy reconstructs what happened during an incident by **correlating Kubernetes events, workload state, and change signals** into a single, time-ordered report — even across multiple clusters.
+OpsAutopsy reconstructs what happened during outages by correlating Kubernetes events, workload state, and change signals across clusters into clear, time-ordered incident reports.
 
----
-
-## Why OpsAutopsy?
-
-Modern platforms have excellent observability tools, but during outages engineers still ask:
-
-- What happened first?
-- What changed?
-- Why did the failure occur?
-- How wide was the impact?
-- Did this affect more than one cluster?
-
-Most tools show **signals**.  
-OpsAutopsy explains **incidents**.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.24+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
 
 ---
 
-## Core Idea
+## The Problem
 
-> **Post-incident intelligence, not real-time monitoring.**
+When incidents occur, your team scrambles to answer:
 
-OpsAutopsy:
-- Does **not** replace Prometheus, Datadog, or cloud monitoring
-- Works **after** an incident occurs
-- Produces a **clear incident narrative**, not dashboards
+- **What happened first?** — Alert floods make root cause unclear
+- **What changed?** — Deployments, configs, and infrastructure changes are scattered
+- **Why did it fail?** — Correlation between events is lost in noise
+- **How wide was the impact?** — Blast radius spans multiple clusters
+- **Did this cascade?** — Cross-cluster failures are invisible
+
+**Most observability tools show signals. OpsAutopsy explains incidents.**
 
 ---
 
-## High-Level Architecture
+## The Solution
+
+OpsAutopsy is purpose-built for **post-incident analysis**, not real-time monitoring.
+
+### Key Capabilities
+
+**🔍 Multi-Cluster Incident Reconstruction**  
+Correlate events across all your Kubernetes clusters in a single timeline
+
+**🕐 Time-Travel Debugging**  
+Query historical cluster state even after Kubernetes garbage-collects events
+
+**🎯 Root Cause Classification**  
+Automatically detect issue types: ImagePullBackOff, CrashLoop, OOMKilled, capacity constraints
+
+**📊 Blast Radius Analysis**  
+Understand incident scope: affected pods, deployments, namespaces, and clusters
+
+**🔗 Change Correlation**  
+Link incidents to deployments, config changes, and infrastructure events
+
+**📝 Human-Readable Reports**  
+Get clear incident narratives, not just raw data dumps
+
+---
+
+## Architecture
 
 ```
-
 ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
 │  Cluster A   │   │  Cluster B   │   │  Cluster C   │
 │              │   │              │   │              │
@@ -52,198 +59,235 @@ OpsAutopsy:
 │ Agent        │   │ Agent        │   │ Agent        │
 │ (DaemonSet)  │   │ (DaemonSet)  │   │ (DaemonSet)  │
 └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
-│                  │                  │
-└──────────┬───────┴──────────┬───────┘
-▼                  ▼
-Centralized PostgreSQL Database
-(Events, Workload State, Metadata)
-│
-▼
-OpsAutopsy Analyzer (CLI)
-(Stateless, Multi-Cluster)
-
+       │                  │                  │
+       └──────────┬───────┴──────────┬───────┘
+                  ▼                  ▼
+         ┌─────────────────────────────────┐
+         │ Centralized PostgreSQL Database │
+         │  (Events, State, Metadata)      │
+         └────────────────┬────────────────┘
+                          ▼
+              ┌───────────────────────┐
+              │ OpsAutopsy Analyzer   │
+              │ (CLI - Stateless)     │
+              └───────────────────────┘
 ```
 
----
+### Components
 
-## Components
+#### 1. OpsAutopsy Agent (Per-Cluster)
 
-### 1. OpsAutopsy Agent (Per Cluster)
+Deployed as a **DaemonSet** for comprehensive node-level coverage.
 
-- **Deployment model:** DaemonSet  
-- **Why DaemonSet:**  
-  - One agent per node  
-  - Captures node-level and scheduling-related signals  
-  - Scales automatically with the cluster  
+**Responsibilities:**
+- Watch Kubernetes Events API
+- Observe Pod, Deployment, and Node state
+- Normalize timestamps to UTC
+- Tag all data with `cluster_id`
+- Stream events to centralized storage
 
-**Responsibilities**
-- Watch Kubernetes **Events**
-- Observe Pod and Deployment state
-- Normalize timestamps (UTC)
-- Attach `cluster_id`
-- Persist data to centralized storage
+**Design Principles:**
+- **Read-only:** Zero risk to cluster stability
+- **Lightweight:** Minimal resource footprint
+- **Safe:** No cluster state mutations
 
-**What it does NOT do**
-- No analysis
-- No alerting
-- No mutation of cluster state
+#### 2. Centralized Storage (PostgreSQL)
 
-> The agent is intentionally **read-only and safe**.
+Kubernetes events are ephemeral (typically 1-hour TTL). OpsAutopsy provides durable incident memory.
 
----
+**Why PostgreSQL?**
+- Powerful time-series querying
+- Native JSON support for flexible schemas
+- Cross-cluster correlation via SQL joins
+- Battle-tested reliability
+- Simple operational model
 
-### 2. Centralized Storage (PostgreSQL)
+**Core Schema:**
 
-Kubernetes events are ephemeral and garbage-collected.  
-OpsAutopsy uses **PostgreSQL** as durable incident memory.
+```sql
+-- events table
+cluster_id, namespace, object_kind, object_name, 
+reason, message, event_time
 
-**Why PostgreSQL**
-- Strong time-based querying
-- Easy correlation across clusters
-- JSON support for flexible payloads
-- Industry-standard and widely trusted
-
-**Conceptual schema (simplified)**
-
+-- workload_state table
+cluster_id, namespace, workload_name, workload_type,
+status, restart_count, observed_time
 ```
 
-## events
+#### 3. OpsAutopsy Analyzer (CLI)
 
-cluster_id
-namespace
-object_kind
-object_name
-reason
-message
-event_time (UTC)
+Stateless analysis engine that runs outside your clusters.
 
-## workload_state
+**Capabilities:**
+- Query events across time windows and clusters
+- Classify incident types automatically
+- Calculate blast radius
+- Correlate changes with failures
+- Generate human-readable reports
 
-cluster_id
-namespace
-workload_name
-workload_type
-status
-restart_count
-observed_time (UTC)
+**Example Usage:**
 
-````
-
-Long-term retention can later be archived to object storage.
-
----
-
-### 3. OpsAutopsy Analyzer (CLI)
-
-The analyzer is **stateless** and runs outside clusters.
-
-**Responsibilities**
-- Load data from PostgreSQL
-- Filter by:
-  - cluster(s)
-  - namespace
-  - time window
-- Reconstruct incident timelines
-- Detect:
-  - Failure types (image pull, crash loop, OOM, capacity)
-  - Blast radius
-  - Change correlation
-- Generate:
-  - Incident summary
-  - Human-readable timeline
-  - Structured JSON output
-
-**Example usage**
 ```bash
+# Analyze recent incident across production clusters
 opsautopsy analyze \
   --clusters prod-eu,prod-us \
   --namespace payments \
   --since 6h
-````
+
+# Investigate specific deployment
+opsautopsy analyze \
+  --deployment checkout-service \
+  --from "2024-01-15T18:00:00Z" \
+  --to "2024-01-15T19:00:00Z"
+
+# Export structured data
+opsautopsy analyze --since 12h --format json > incident.json
+```
 
 ---
 
-## Incident Model
+## Sample Output
 
-OpsAutopsy treats incidents as **time-bounded correlated failures**, not single alerts.
-
-### Incident Summary (Example)
+### Incident Summary
 
 ```
+═══════════════════════════════════════════════════
+INCIDENT ANALYSIS: 2024-01-15 18:14 - 18:32 UTC
+═══════════════════════════════════════════════════
+
 Detected Issues:
-- IMAGE_PULL_FAILURE
-- CRASH_LOOP
-- CAPACITY_SCHEDULING
+  • IMAGE_PULL_FAILURE (ErrImagePull, ImagePullBackOff)
+  • CRASH_LOOP (CrashLoopBackOff)
+  • CAPACITY_SCHEDULING (Insufficient CPU/Memory)
 
-Affected Pods    : 9
-Affected Deploys : 1
-Clusters Impacted: 2
-Change Related   : NO
+Impact:
+  Affected Pods        : 9
+  Affected Deployments : 1
+  Namespaces           : 2
+  Clusters             : prod-eu, prod-us
+
+Change Correlation: NO
+  No deployments or config changes detected in 1h window
 ```
 
-### Timeline (Evidence)
+### Timeline
 
 ```
-18:14 | FailedScheduling | cpu-pressure-pod
-18:15 | BackOff          | crashloop-pod
-18:16 | Failed           | bad-image-pod
-```
+18:14:23 UTC | WARN | prod-eu    | kube-system | FailedScheduling
+             | Node cpu-pressure-node: Insufficient cpu
 
-* **Summary** = classification
-* **Timeline** = proof
+18:15:01 UTC | ERROR| prod-us    | payments    | BackOff
+             | crashloop-pod: Back-off restarting failed container
+
+18:16:47 UTC | ERROR| prod-eu    | payments    | Failed
+             | bad-image-pod: ErrImagePull (manifest unknown)
+
+18:18:12 UTC | WARN | prod-eu    | payments    | Unhealthy
+             | Readiness probe failed (3 consecutive failures)
+```
 
 ---
 
-## Architectural Principles
+## Design Philosophy
 
-* **Separation of concerns**
-  Collection ≠ Analysis
-* **Read-only by design**
-  Zero blast-radius risk
-* **Cloud-agnostic**
-  No provider lock-in
-* **Post-incident intelligence**
-  Complements observability
-* **Multi-cluster first**
-  Cluster is a dimension, not a boundary
+### Separation of Concerns
+
+**Collection ≠ Analysis**  
+Agents collect, analyzer interprets. Clean boundaries enable independent scaling.
+
+### Read-Only by Design
+
+Agents never mutate cluster state. Zero blast-radius risk during incidents.
+
+### Cloud-Agnostic
+
+Works with any Kubernetes distribution: EKS, GKE, AKS, on-prem, k3s, etc.
+
+### Multi-Cluster First
+
+Treats clusters as a dimension, not a boundary. Incidents don't respect cluster limits.
+
+### Post-Incident Intelligence
+
+Complements real-time monitoring. Starts when alerts fire and understanding matters most.
 
 ---
 
 ## What OpsAutopsy Is NOT
 
-* Not a monitoring system
-* Not an alerting platform
-* Not a dashboard tool
-* Not a replacement for Prometheus, Datadog, or cloud monitoring
+| ❌ OpsAutopsy is NOT | ✅ Use Instead |
+|---------------------|---------------|
+| Real-time monitoring | Prometheus, Datadog |
+| Alerting platform | PagerDuty, Opsgenie |
+| Metrics scraping | Prometheus, VictoriaMetrics |
+| Dashboard tool | Grafana, Kibana |
+| Log aggregation | Loki, ELK Stack |
 
-> OpsAutopsy starts **after alerts fire**, when understanding matters most.
-
----
-
-## Current Scope (v1)
-
-### Included
-
-* DaemonSet-based agents
-* Centralized PostgreSQL storage
-* Multi-cluster analysis
-* Issue classification
-* Blast radius detection
-* CLI-based reports
-
-### Explicitly Deferred
-
-* Dashboards / UI
-* Real-time alerting
-* Metrics scraping
-* Machine learning / anomaly detection
+> **OpsAutopsy starts after alerts fire, when understanding matters most.**
 
 ---
 
-## One-Line Positioning
+## Roadmap
 
-> **OpsAutopsy is a cloud-agnostic, multi-cluster Kubernetes incident forensics engine that reconstructs outages into clear, time-ordered explanations using centralized data.**
+### ✅ v1.0 (Current Scope)
 
+- [x] DaemonSet-based agents
+- [x] Centralized PostgreSQL storage
+- [x] Multi-cluster event correlation
+- [x] Incident classification engine
+- [x] Blast radius detection
+- [x] CLI-based analysis and reporting
+
+### 🚧 Future Enhancements
+
+- [ ] Web UI for incident exploration
+- [ ] Slack/Teams integration for report delivery
+- [ ] Change tracking (GitOps, Helm, ArgoCD)
+- [ ] Capacity trend analysis
+- [ ] Export to incident management platforms
+- [ ] S3/GCS archival for long-term retention
+
+---
+
+## Quick Start
+
+```bash
+# Deploy agent to your cluster
+kubectl apply -f https://github.com/yourorg/opsautopsy/releases/latest/agent.yaml
+
+# Configure database connection
+kubectl create secret generic opsautopsy-db \
+  --from-literal=url=postgresql://user:pass@host:5432/opsautopsy
+
+# Install CLI
+brew install opsautopsy
+# or
+go install github.com/yourorg/opsautopsy/cmd/opsautopsy@latest
+
+# Run your first analysis
+opsautopsy analyze --since 1h
 ```
 
 ---
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details
+
+---
+
+## Support
+
+- 📖 **Documentation:** [docs.opsautopsy.io](https://docs.opsautopsy.io)
+- 💬 **Discussions:** [GitHub Discussions](https://github.com/yourorg/opsautopsy/discussions)
+- 🐛 **Issues:** [GitHub Issues](https://github.com/yourorg/opsautopsy/issues)
+
+---
+
+**Built with ❤️ for SREs who deserve better incident post-mortems**
