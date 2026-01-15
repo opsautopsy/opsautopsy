@@ -5,13 +5,18 @@ def stream_events(cluster_id):
     v1 = client.CoreV1Api()
     w = watch.Watch()
 
-    for e in w.stream(v1.list_event_for_all_namespaces):
+    for event in w.stream(v1.list_event_for_all_namespaces):
+        obj = event.get("object")
+
+        if not obj or not obj.last_timestamp:
+            continue
+
         yield (
             cluster_id,
-            e.metadata.namespace,
-            e.involved_object.kind,
-            e.involved_object.name,
-            e.reason,
-            e.message,
-            e.last_timestamp.replace(tzinfo=timezone.utc)
+            obj.metadata.namespace,
+            obj.involved_object.kind,
+            obj.involved_object.name,
+            obj.reason,
+            obj.message,
+            obj.last_timestamp.replace(tzinfo=timezone.utc)
         )

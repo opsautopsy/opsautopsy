@@ -14,13 +14,14 @@ spec:
     spec:
       serviceAccountName: opsautopsy-agent
       containers:
-      - name: agent
-        image: opsautopsy/agent:latest
-        env:
-        - name: CLUSTER_ID
-          value: prod-cluster
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: opsautopsy-db
-              key: url
+        - name: agent
+          image: opsautopsy/agent:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CLUSTER_ID
+              value: prod-cluster
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: opsautopsy-db
+                  key: url
