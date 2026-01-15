@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: opsautopsy-agent
+  namespace: opsautopsy
+spec:
+  selector:
+    matchLabels:
+      app: opsautopsy-agent
+  template:
+    metadata:
+      labels:
+        app: opsautopsy-agent
+    spec:
+      serviceAccountName: opsautopsy-agent
+      containers:
+      - name: agent
+        image: opsautopsy/agent:latest
+        env:
+        - name: CLUSTER_ID
+          value: prod-cluster
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: opsautopsy-db
+              key: url
