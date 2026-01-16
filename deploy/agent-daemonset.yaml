@@ -15,7 +15,7 @@ spec:
       serviceAccountName: opsautopsy-agent
       containers:
         - name: agent
-          image: opsautopsy/agent:latest
+          image: nikhilthb/opsautopsy-agent:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: CLUSTER_ID
